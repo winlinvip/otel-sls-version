@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -58,22 +60,44 @@ func handleStable() {
 	listen := os.Args[1]
 
 	stableHandler := func(w http.ResponseWriter, req *http.Request) {
-		if time.Now().Unix()%3 == 0 {
-			_, _ = io.WriteString(w, "Stable, world!\n")
-		} else {
-			// 如果需要记录一些事件，可以获取Context中的span并添加Event（非必要步骤）
-			ctx := req.Context()
-			span := trace.SpanFromContext(ctx)
-			span.AddEvent("say : Stable is SRS 4.0", trace.WithAttributes(label.KeyValue{
-				Key: "label-key-3", Value: label.StringValue("label-value-4")},
-			))
+		time.Sleep(900 * time.Millisecond)
 
-			_, _ = io.WriteString(w, "Stable is SRS 4.0!\n")
-		}
+		// 如果需要记录一些事件，可以获取Context中的span并添加Event（非必要步骤）
+		ctx := req.Context()
+		span := trace.SpanFromContext(ctx)
+		span.AddEvent("say : Stable is SRS 4.0", trace.WithAttributes(label.KeyValue{
+			Key: "label-key-3", Value: label.StringValue("label-value-4")},
+		))
+
+		// 创建新的ChildSpan
+		dbRequest(ctx, span.Tracer())
+
+		b, _ := json.Marshal(map[string]interface{}{
+			"stable": "Stable is SRS 4.0!",
+			"headers": req.Header,
+		})
+		_, _ = io.WriteString(w, string(b))
 	}
 	// 使用 otel net/http的自动注入方式，只需要使用otelhttp.NewHandler包裹http.Handler即可
 	otelHandler := otelhttp.NewHandler(http.HandlerFunc(stableHandler), "Stable")
 	http.Handle("/stable", otelHandler)
+	/*
+	http.Handle("/stable", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+	opts := append([]trace.SpanOption{
+		trace.WithAttributes(semconv.NetAttributesFromHTTPRequest("tcp", r)...),
+		trace.WithAttributes(semconv.EndUserAttributesFromHTTPRequest(r)...),
+		trace.WithAttributes(semconv.HTTPServerAttributesFromHTTPRequest("XXX", "", r)...),
+	}, h.spanStartOptions...) // start with the configured options
+	}))*/
 	fmt.Println(fmt.Sprintf("You can visit http://127.0.0.1:%v/stable .", listen))
+}
+
+func dbRequest(ctx context.Context, tracer trace.Tracer) {
+	ctx, span := tracer.Start(ctx, "MySQL")
+	span.AddEvent("DB is done")
+	defer span.End()
+
+	time.Sleep(800 * time.Millisecond)
 }
 

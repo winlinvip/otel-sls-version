@@ -14,7 +14,7 @@
 # Dependency directories (remove the comment below to include it)
 # vendor/
 
-otel-sls-version
 .idea
 api-server/api-server
+stable-version/stable-version
 

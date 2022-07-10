@@ -1,4 +1,4 @@
-module otel-sls-version
+module api-server
 
 go 1.13
 
